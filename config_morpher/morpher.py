@@ -4,7 +4,7 @@ import inspect
 import tomllib
 from enum import Enum
 from pathlib import Path
-from dataclasses import is_dataclass, fields, make_dataclass
+from dataclasses import is_dataclass, fields, make_dataclass, field
 from typing import Any, Union, NewType, Iterable, Dict, List
 
 from .utils import iterate_and_fetch_dict_value
@@ -27,7 +27,13 @@ def create_dataclass_from_callable(callable_obj):
             continue
         param_type = param.annotation if param.annotation is not param.empty else Any
         param_default = param.default if param.default is not param.empty else None
-        fields_list.append((param_name, param_type, param_default))
+
+        # Handle mutable default values
+        if param_default is not None and isinstance(param_default, (list, dict, set)):
+            # Use default_factory for mutable defaults
+            fields_list.append((param_name, param_type, field(default_factory=lambda: param_default.__class__())))
+        else:
+            fields_list.append((param_name, param_type, param_default))
 
     dataclass_name = f"{callable_obj.__name__}DataClass"
     return make_dataclass(dataclass_name, fields_list)
