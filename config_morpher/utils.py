@@ -90,15 +90,32 @@ def iterate_and_fetch_dict_value(cursor:dict, to:Union[str, List[str]]) -> Any:
             if not check_key_under_brackets(key):
                 raise ValueError(f"Expected list-style key like '[0]' but got '{key}'.")
 
-            idx_str = key[1:-1]
-            if not idx_str.isdigit():
-                raise ValueError(f"List index '{idx_str}' is not a valid integer.")
+            inner = key[1:-1]
 
-            idx = int(idx_str)
-            if idx >= len(cursor) or idx < 0:
-                raise IndexError(f"List index {idx} out of range.")
+            # Case: [index]
+            if inner.isdigit():
+                idx = int(inner)
 
-            cursor = cursor[idx]
+                if idx >= len(cursor) or idx < 0:
+                    raise IndexError(f"List index {idx} out of range.")
+
+                cursor = cursor[idx]
+
+            # Case: [key=value]
+            elif '=' in inner:
+                if inner.count('=') != 1:
+                    raise ValueError(f"Invalid key=value format: '{key}'")
+
+                inner_key, inner_value = inner.split('=', 1)
+                matched = False
+                for _dict in cursor:
+                    if isinstance(_dict, dict) and _dict.get(inner_key) == inner_value:
+                        cursor = _dict
+                        matched = True
+                        break
+
+                if not matched:
+                    raise ValueError(f"No item in list matches condition [{inner_key}={inner_value}]")
 
         else:
             raise ValueError(f"Cannot traverse into type '{type(cursor).__name__}' with key '{key}'.")
