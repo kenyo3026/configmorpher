@@ -1,5 +1,21 @@
+import re
+
 from typing import Any, List, Union
 
+
+def split_by_dot_and_brackets(s:str):
+    parts = re.split(r'\.(?![^\[]*\])', s)
+    result = []
+    for part in parts:
+        match = re.match(r'([^\[]+)(\[.*\])?', part)
+        if match:
+            result.append(match.group(1))
+            if match.group(2):
+                result.append(match.group(2))
+    return result
+
+def check_key_under_brackets(key:str):
+    return bool(key.startswith('[') and key.endswith(']'))
 
 def iterate_and_fetch_dict_value(cursor:dict, to:Union[str, List[str]]) -> Any:
     """
@@ -51,16 +67,40 @@ def iterate_and_fetch_dict_value(cursor:dict, to:Union[str, List[str]]) -> Any:
     if isinstance(to, str):
         if not to.strip():
             raise ValueError("The provided `to` string is empty or invalid.")
-        to = to.split('.')
+        # to = to.split('.')
+        to = split_by_dot_and_brackets(to)
     elif isinstance(to, list):
         if not to:
             raise ValueError("The provided `to` list is empty.")
 
     for key in to:
-        if not isinstance(cursor, dict):
-            raise ValueError(f"The nested structure is invalid: expected dictionary at key '{key}', "
-                             f"but got {type(cursor).__name__}.")
-        cursor = cursor.get(key)
-        if cursor is None:
-            raise ValueError(f"Key '{key}' not found in the cursor dictionary.")
+
+        if isinstance(cursor, dict):
+
+            if check_key_under_brackets(key):
+                raise ValueError(f"Unexpected list-style key '{key}' in dict context.")
+
+            if key not in cursor:
+                raise ValueError(f"Key '{key}' not found in the cursor dictionary.")
+
+            cursor = cursor[key]
+
+        elif isinstance(cursor, list):
+
+            if not check_key_under_brackets(key):
+                raise ValueError(f"Expected list-style key like '[0]' but got '{key}'.")
+
+            idx_str = key[1:-1]
+            if not idx_str.isdigit():
+                raise ValueError(f"List index '{idx_str}' is not a valid integer.")
+
+            idx = int(idx_str)
+            if idx >= len(cursor) or idx < 0:
+                raise IndexError(f"List index {idx} out of range.")
+
+            cursor = cursor[idx]
+
+        else:
+            raise ValueError(f"Cannot traverse into type '{type(cursor).__name__}' with key '{key}'.")
+
     return cursor
