@@ -72,6 +72,9 @@ def iterate_and_fetch_dict_value(cursor:dict, to:Union[str, List[str]]) -> Any:
     elif isinstance(to, list):
         if not to:
             raise ValueError("The provided `to` list is empty.")
+    else:
+        raise ValueError("The provided `to` must be a string or list.")
+
 
     for key in to:
 
